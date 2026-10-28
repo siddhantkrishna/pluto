@@ -10,13 +10,13 @@ from . import schemas as s
 from .config import settings
 from .db import database
 from .models import ContentChunk, Dataset, IngestFile, IngestJob
+from .parsers import SUPPORTED
 from .repository import page, scoped
 from .security import tenant
 from .services import audit, lock_institution
 from .storage import objects
 
 router = APIRouter(prefix="/api/v1/ingestion", tags=["ingestion"])
-SUPPORTED = {"txt", "csv", "json", "jsonl"}
 
 
 class Upload(s.Input):
@@ -34,6 +34,7 @@ class FileOut(s.RecordOut):
     checksum: str
     state: str
     error: str
+    preview_available: bool
 
 
 @router.post("/{institution_id}/files", response_model=FileOut, status_code=201)
@@ -52,7 +53,7 @@ def initialize(
         or any(ord(c) < 32 for c in body.name)
         or body.name.rsplit(".", 1)[-1].lower() not in SUPPORTED
     ):
-        raise HTTPException(422, "Supported files: TXT, CSV, JSON, JSONL. Use a plain filename.")
+        raise HTTPException(422, "Unsupported file extension or unsafe filename.")
     used = db.scalar(
         select(func.coalesce(func.sum(IngestFile.size), 0)).where(
             IngestFile.institution_id == institution_id, IngestFile.state != "cancelled"
@@ -206,6 +207,13 @@ def download(
     record = scoped(db, IngestFile, institution_id, file_id)
     if record.state not in ("ready", "queued", "processing", "failed"):
         raise HTTPException(404, "File unavailable")
+    if (
+        record.source_metadata.get("provider_id")
+        and not objects.path(institution_id, file_id).is_file()
+    ):
+        from .connectors import remote_download
+
+        return remote_download(db, record)
     return FileResponse(
         objects.path(institution_id, file_id),
         media_type="application/octet-stream",
@@ -237,3 +245,66 @@ def search(
         .mappings()
         .all()
     )
+
+
+@router.get("/{institution_id}/files/{file_id}/preview")
+def preview(
+    institution_id: UUID,
+    file_id: UUID,
+    member=Depends(tenant()),
+    db=Depends(database, scope="function"),
+):
+    record = scoped(db, IngestFile, institution_id, file_id)
+    path = objects.path(institution_id, file_id).with_suffix(".preview.png")
+    if record.state != "ready" or not path.is_file():
+        raise HTTPException(404, "Preview unavailable")
+    return FileResponse(path, media_type="image/png")
+
+
+@router.get("/{institution_id}/files/{file_id}/content", response_model=s.Page[dict])
+def content(
+    institution_id: UUID,
+    file_id: UUID,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    member=Depends(tenant()),
+    db=Depends(database, scope="function"),
+):
+    record = scoped(db, IngestFile, institution_id, file_id)
+    if record.state != "ready":
+        raise HTTPException(409, "File is not indexed")
+    result = page(
+        db,
+        select(ContentChunk)
+        .where(ContentChunk.institution_id == institution_id, ContentChunk.file_id == file_id)
+        .order_by(ContentChunk.position),
+        offset,
+        limit,
+    )
+    result["items"] = [
+        {"reference": chunk.reference, "content": chunk.content} for chunk in result["items"]
+    ]
+    return result
+
+
+@router.get("/{institution_id}/usage", response_model=dict)
+def usage(institution_id: UUID, member=Depends(tenant()), db=Depends(database, scope="function")):
+    totals = db.execute(
+        select(
+            func.count(IngestFile.id),
+            func.coalesce(func.sum(IngestFile.size), 0),
+            func.coalesce(func.sum(IngestFile.received), 0),
+        ).where(IngestFile.institution_id == institution_id, IngestFile.state != "cancelled")
+    ).one()
+    indexed = db.scalar(
+        select(func.coalesce(func.sum(func.octet_length(ContentChunk.content)), 0)).where(
+            ContentChunk.institution_id == institution_id
+        )
+    )
+    return {
+        "files": totals[0],
+        "source_bytes": totals[1],
+        "retrieved_bytes": totals[2],
+        "indexed_text_bytes": indexed,
+        "quota_bytes": settings.institution_storage_bytes,
+    }

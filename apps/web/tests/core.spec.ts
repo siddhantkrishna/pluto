@@ -144,7 +144,7 @@ test("resumable upload interface queues real content", async ({ page }) => {
   });
   await page.goto(`/workspace/${org.id}/imports`);
   await expect(
-    page.getByRole("option", { name: "Upload verification" }),
+    page.getByRole("option", { name: "Upload verification" }).first(),
   ).toBeAttached();
   await page.getByLabel("Choose or drop a file").setInputFiles({
     name: "test.txt",
@@ -152,7 +152,7 @@ test("resumable upload interface queues real content", async ({ page }) => {
     buffer: Buffer.from("Verified institutional text"),
   });
   await expect(
-    page.getByRole("option", { name: "Upload verification" }),
+    page.getByRole("option", { name: "Upload verification" }).first(),
   ).toBeAttached();
   await page.getByRole("button", { name: "Upload / resume" }).click();
   await expect(

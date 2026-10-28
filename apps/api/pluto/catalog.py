@@ -1,11 +1,11 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from . import schemas as s
 from .db import database
-from .models import Dataset, DataSource, Membership, User
+from .models import Dataset, DataSource, IngestFile, Membership, User
 from .repository import page, scoped
 from .security import tenant
 from .services import audit, lock_institution
@@ -112,6 +112,11 @@ def delete_dataset(
     db=Depends(database, scope="function"),
 ):
     record = scoped(db, Dataset, institution_id, dataset_id)
+    db.execute(
+        delete(IngestFile).where(
+            IngestFile.institution_id == institution_id, IngestFile.dataset_id == dataset_id
+        )
+    )
     db.delete(record)
     audit(db, request, "dataset.deleted", dataset_id, institution_id)
     return {"message": "Dataset metadata deleted"}

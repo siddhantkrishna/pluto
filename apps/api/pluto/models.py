@@ -168,7 +168,17 @@ class RateLimit(Base):
 
 
 class IngestFile(Record, Tenant, Base):
+    @property
+    def preview_available(self):
+        from .storage import objects
+
+        return (
+            self.state == "ready"
+            and objects.path(self.institution_id, self.id).with_suffix(".preview.png").is_file()
+        )
+
     __tablename__ = "ingest_files"
+    source_metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
     dataset_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     name: Mapped[str] = mapped_column(String(255))
     size: Mapped[int] = mapped_column(BigInteger)
@@ -221,3 +231,24 @@ class ContentChunk(Record, Tenant, Base):
         ),
         Index("ix_chunks_fts", text("to_tsvector('english', content)"), postgresql_using="gin"),
     )
+
+
+class SourceConnection(Record, Tenant, Base):
+    __tablename__ = "source_connections"
+    provider: Mapped[str] = mapped_column(String(20))
+    encrypted: Mapped[str] = mapped_column(Text)
+    state: Mapped[str] = mapped_column(String(20), default="active")
+    cursor: Mapped[str] = mapped_column(Text, default="")
+    __table_args__ = (
+        UniqueConstraint("institution_id", "id"),
+        CheckConstraint("provider IN ('google','postgres')"),
+    )
+
+
+class OAuthFlow(Record, Tenant, Base):
+    __tablename__ = "oauth_flows"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("auth_sessions.id"))
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    verifier: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -4,7 +4,7 @@ PLUTO Core is a multi-institution data catalog and governance platform. It provi
 
 **Step 01 baseline:** source definitions do not connect to external systems. No ingestion, file upload, AI, knowledge graph, or analytical pipeline is implemented. No AI API key or paid service is needed locally.
 
-A resumable text-ingestion subset is now available under **Imports & search**. Step 02 remains incomplete; see the current supported formats, worker setup, bounds and missing capabilities in [operations](docs/operations.md#text-ingestion-subset-step-02-in-progress).
+Source connections and multimodal ingestion are available under **Imports & search**. See [operations](docs/operations.md#source-ingestion-and-processing) for supported formats, worker configuration, Google OAuth setup and processing bounds. Live provider and capacity validation remain deployment tasks.
 
 ## Run with Docker
 

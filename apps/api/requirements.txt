@@ -6,3 +6,13 @@ psycopg[binary]==3.3.6
 pydantic-settings==2.16.1
 email-validator==2.3.0
 argon2-cffi==25.1.0
+pymupdf==1.26.7
+python-docx==1.2.0
+python-pptx==1.0.2
+openpyxl==3.1.5
+polars==2.1.0
+pyarrow==26.0.0
+pillow==13.0.0
+ijson==3.6.0
+cryptography==46.0.5
+httpx==0.28.1

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, FormEvent } from "react";
 import { createSHA256 } from "hash-wasm";
 import { api, uploadChunk, all, Dataset, Page } from "@/lib/api";
 import { Feedback } from "./ui";
+import { Connections } from "./connections";
 type FileRecord = {
   id: string;
   name: string;
@@ -10,10 +11,17 @@ type FileRecord = {
   received: number;
   size: number;
   error: string;
+  preview_available: boolean;
 };
 export function Imports({ id }: { id: string }) {
   const [datasets, setDatasets] = useState<Dataset[]>([]),
     [records, setRecords] = useState<FileRecord[]>([]),
+    [usage, setUsage] = useState<{
+      files: number;
+      source_bytes: number;
+      retrieved_bytes: number;
+      indexed_text_bytes: number;
+    } | null>(null),
     [selected, setSelected] = useState<File>(),
     [progress, setProgress] = useState(""),
     [error, setError] = useState(""),
@@ -25,12 +33,13 @@ export function Imports({ id }: { id: string }) {
   async function refresh() {
     const result = await api<Page<FileRecord>>(`/ingestion/${id}/files`);
     setRecords(result.items);
+    setUsage(await api(`/ingestion/${id}/usage`));
   }
   useEffect(() => {
     all<Dataset>(`/catalog/${id}`)
       .then(setDatasets)
       .catch((e) => setError(e.message));
-    void refresh();
+    refresh().catch((e) => setError(e.message));
     const timer = setInterval(() => {
       refresh().catch((e) => setError(e.message));
     }, 5000);
@@ -90,11 +99,19 @@ export function Imports({ id }: { id: string }) {
   }
   return (
     <>
+      <Connections id={id} datasets={datasets} />
       <h1>Imports & search</h1>
+      {usage && (
+        <p className="mono">
+          {usage.files} files / {usage.source_bytes} source bytes /{" "}
+          {usage.retrieved_bytes} retrieved bytes / {usage.indexed_text_bytes}{" "}
+          indexed text bytes
+        </p>
+      )}
       <p>
-        Upload TXT, CSV, JSON or JSONL files. Select the same file to resume an
-        interrupted upload. Extraction currently supports UTF-8 text up to 64
-        MiB.
+        Upload documents, structured files, images, audio or video. Select the
+        same file to resume an interrupted upload. Extraction currently supports
+        UTF-8 text up to 64 MiB.
       </p>
       <Feedback error={error} message={progress} />
       <form
@@ -120,7 +137,7 @@ export function Imports({ id }: { id: string }) {
           Choose or drop a file
           <input
             type="file"
-            accept=".txt,.csv,.json,.jsonl"
+            accept=".txt,.csv,.json,.jsonl,.pdf,.docx,.pptx,.xlsx,.parquet,.jpg,.jpeg,.png,.webp,.tif,.tiff,.mp3,.wav,.m4a,.mp4,.mov,.webm"
             onChange={(e) => setSelected(e.target.files?.[0])}
           />
         </label>
@@ -164,6 +181,16 @@ export function Imports({ id }: { id: string }) {
                 </td>
                 <td>
                   <div className="row">
+                    {r.preview_available && (
+                      <a
+                        className="text-link"
+                        target="_blank"
+                        rel="noreferrer"
+                        href={`/api/v1/ingestion/${id}/files/${r.id}/preview`}
+                      >
+                        Preview
+                      </a>
+                    )}
                     {["ready", "failed"].includes(r.state) && (
                       <button
                         onClick={() =>

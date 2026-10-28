@@ -18,6 +18,19 @@ class Settings(BaseSettings):
     institution_storage_bytes: int = Field(default=1099511627776, ge=1)
     max_upload_bytes: int = Field(default=10737418240, ge=1)
     worker_institution: str = ""
+    cache_remote_files: bool = False
+    max_record_bytes: int = Field(default=4194304, ge=1024)
+    archive_expansion_bytes: int = Field(default=536870912, ge=1)
+    max_image_pixels: int = Field(default=40000000, ge=1)
+    parser_timeout: int = Field(default=600, ge=1)
+    media_keyframes: int = Field(default=1, ge=1, le=8)
+    retention_days: int = Field(default=0, ge=0)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_picker_api_key: str = ""
+    google_project_number: str = ""
+    credential_encryption_key: str = ""
+    postgres_allowed_hosts: str = ""
     smtp_host: str = ""
     smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_user: str = ""
