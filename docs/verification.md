@@ -24,3 +24,7 @@ The test environment emits a Starlette notice that its httpx TestClient adapter 
 Browser checks create identifiable verification accounts/workspaces in the development database. They are test records, not seeded product metrics or operational examples. No default production account is created.
 
 Step 02 ingestion, connectors, AI, graph discovery, and analytics remain outside this implementation. No 1 TB capacity or security certification is claimed.
+
+## Subsequent text-ingestion subset verification
+
+The incomplete Step 02 text-ingestion subset was verified with 30 passing backend tests and four passing production-server browser tests. New coverage exercises resumable chunk offsets, incomplete upload rejection, checksum mismatch, filename traversal rejection, worker processing/idempotency, tenant-isolated full-text search, authorized original download, cancellation and object cleanup, retry exhaustion/reprocessing, and the browser upload flow. The migration round-trip test now includes both ingestion revisions and checks schema drift. TypeScript, production build, Ruff, Prettier and Compose configuration checks pass. Containers were not executed. No Google Drive, external database connector, multimodal parser or 1 TB throughput verification is claimed; those capabilities remain unimplemented.

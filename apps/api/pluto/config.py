@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:3000"
     session_hours: int = Field(default=12, ge=1, le=168)
     mail_directory: str = ".dev-mail"
+    object_directory: str = ".objects"
+    institution_storage_bytes: int = Field(default=1099511627776, ge=1)
+    max_upload_bytes: int = Field(default=10737418240, ge=1)
+    worker_institution: str = ""
     smtp_host: str = ""
     smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_user: str = ""

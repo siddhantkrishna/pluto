@@ -27,7 +27,7 @@ services:
     restart: 'no'
   api:
     build: ./apps/api
-    environment:
+    environment: &api_environment
       DATABASE_URL: ${DATABASE_URL}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
@@ -40,6 +40,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - dev_mail:/app/.dev-mail
+      - objects:/app/.objects
     ports:
       - '127.0.0.1:8000:8000'
     depends_on:
@@ -50,6 +51,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+  worker:
+    build: ./apps/api
+    profiles: [processing]
+    environment:
+      <<: *api_environment
+      WORKER_INSTITUTION: ${WORKER_INSTITUTION:-}
+    command: [python, -m, pluto.worker]
+    volumes:
+      - objects:/app/.objects
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 64
   web:
     build:
       context: ./apps/web
@@ -70,3 +86,4 @@ services:
 volumes:
   postgres_data:
   dev_mail:
+  objects:

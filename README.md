@@ -2,7 +2,9 @@
 
 PLUTO Core is a multi-institution data catalog and governance platform. It provides account authentication, independent institutional workspaces, membership and invitation management, role-based permissions, metadata catalogs, source definitions, activity history, and installation administration.
 
-**Step 01 only:** source definitions do not connect to external systems. No ingestion, file upload, AI, knowledge graph, or analytical pipeline is implemented. No AI API key or paid service is needed locally.
+**Step 01 baseline:** source definitions do not connect to external systems. No ingestion, file upload, AI, knowledge graph, or analytical pipeline is implemented. No AI API key or paid service is needed locally.
+
+A resumable text-ingestion subset is now available under **Imports & search**. Step 02 remains incomplete; see the current supported formats, worker setup, bounds and missing capabilities in [operations](docs/operations.md#text-ingestion-subset-step-02-in-progress).
 
 ## Run with Docker
 

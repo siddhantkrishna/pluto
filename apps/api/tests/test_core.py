@@ -456,7 +456,9 @@ def test_migration_round_trip():
         )
         assert result.returncode == 0, result.stdout + result.stderr
     with SessionLocal.begin() as db:
-        assert db.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0001_core"
+        assert (
+            db.execute(text("SELECT version_num FROM alembic_version")).scalar() == "8df720f6449b"
+        )
 
 
 def test_bootstrap_administrator_one_time(client):

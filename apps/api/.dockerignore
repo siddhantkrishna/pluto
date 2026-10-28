@@ -4,3 +4,5 @@ __pycache__
 .dev-mail
 .env*
 tests
+
+.objects

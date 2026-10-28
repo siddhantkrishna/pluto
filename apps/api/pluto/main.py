@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from . import auth, catalog, platform, workspaces
+from . import auth, catalog, ingestion, platform, workspaces
 from .config import settings
 from .db import engine
 
@@ -153,5 +153,5 @@ def health():
     return {"status": "ok"}
 
 
-for router in (auth.router, workspaces.router, catalog.router, platform.router):
+for router in (auth.router, workspaces.router, catalog.router, platform.router, ingestion.router):
     app.include_router(router)

@@ -30,6 +30,7 @@ export function Shell({ me, children }: { me: Me; children: React.ReactNode }) {
     ? [
         ["overview", "Overview"],
         ["catalog", "Data catalog"],
+        ["imports", "Imports & search"],
         ["sources", "Data sources"],
         ["members", "Members"],
         ...(admin

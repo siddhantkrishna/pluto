@@ -20,6 +20,19 @@ let csrf = "";
 export function setCSRF(value: string) {
   csrf = value;
 }
+export async function uploadChunk(path: string, data: Blob): Promise<void> {
+  const response = await fetch(`/api/v1${path}`, {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-CSRF-Token": csrf,
+    },
+    body: data,
+  });
+  if (!response.ok)
+    throw new Error((await response.json()).error?.message || "Upload failed");
+}
 export async function api<T>(
   path: string,
   method = "GET",

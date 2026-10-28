@@ -113,3 +113,49 @@ test("mobile landing and login have no horizontal overflow", async ({
     ),
   ).toBe(true);
 });
+
+test("resumable upload interface queues real content", async ({ page }) => {
+  const email = `ingest-browser-${Date.now()}@example.org`,
+    password = "Browser verification passphrase!";
+  const headers = { Origin: "http://localhost:3000" };
+  await page.request.post("/api/v1/auth/register", {
+    headers,
+    data: { name: "Ingestion Test", email, password },
+  });
+  const login = await page.request.post("/api/v1/auth/login", {
+    headers,
+    data: { email, password },
+  });
+  const me = await login.json();
+  const authenticated = { ...headers, "X-CSRF-Token": me.csrf };
+  const org = await (
+    await page.request.post("/api/v1/institutions", {
+      headers: authenticated,
+      data: { name: "Ingestion Verification Institute" },
+    })
+  ).json();
+  await page.request.post(`/api/v1/catalog/${org.id}`, {
+    headers: authenticated,
+    data: {
+      name: "Upload verification",
+      source_category: "local_file",
+      owner_id: me.user.id,
+    },
+  });
+  await page.goto(`/workspace/${org.id}/imports`);
+  await expect(
+    page.getByRole("option", { name: "Upload verification" }),
+  ).toBeAttached();
+  await page.getByLabel("Choose or drop a file").setInputFiles({
+    name: "test.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Verified institutional text"),
+  });
+  await expect(
+    page.getByRole("option", { name: "Upload verification" }),
+  ).toBeAttached();
+  await page.getByRole("button", { name: "Upload / resume" }).click();
+  await expect(
+    page.getByRole("cell", { name: "queued", exact: true }),
+  ).toBeVisible();
+});
