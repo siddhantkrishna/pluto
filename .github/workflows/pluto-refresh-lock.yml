@@ -1,0 +1,29 @@
+name: Refresh PLUTO web dependency lockfile
+on:
+  push:
+    branches: [codex/next-neon-backend]
+    paths:
+      - .github/workflows/pluto-refresh-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9 # v4.2.2
+        with:
+          persist-credentials: true
+      - name: Update lockfile without running dependency scripts
+        working-directory: apps/web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit reproducible lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(web): lock Neon serverless dependency graph"
+            git push origin HEAD:codex/next-neon-backend
+          fi
