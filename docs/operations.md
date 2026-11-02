@@ -42,6 +42,29 @@ Use a pooled connection string for `DATABASE_URL`, and a direct, non-pooler conn
 
 Run the same Alembic migration job before rolling out API replicas. Provision the initial platform administrator through the one-time command. Supply SMTP and set `ENVIRONMENT=production`, `WEB_ORIGIN=https://your-authorized-domain`. No Neon credentials were supplied during implementation; hosted deployment is a separate operator action.
 
+## Vercel frontend deployment
+
+The `apps/web` Next.js project can run on Vercel, but this does **not** deploy the
+FastAPI backend, PostgreSQL, migration job, or background ingestion workers. Account
+registration and login are unavailable until those services are deployed separately.
+
+1. Deploy `apps/api` and the required PostgreSQL database, run Alembic migrations,
+   and verify `GET /health` returns `{"status":"ok"}`. Configure the API's
+   `WEB_ORIGIN` to the exact HTTPS frontend origin (for example,
+   `https://pluto.vogon.in`). Production SMTP configuration is also required
+   for recovery/invitations.
+2. In Vercel project environment settings, set the **server-only**
+   `API_INTERNAL_URL` to the backend's reachable HTTPS origin (without
+   `/api/v1`); redeploy the web project. Never use `localhost`,
+   `127.0.0.1`, or a Docker-only hostname on Vercel.
+3. Verify `POST /api/v1/auth/register` via the web origin and then test
+   sign-in. The browser should never need to contact the API on another origin.
+
+When `API_INTERNAL_URL` is absent in production, web API paths deliberately
+return JSON with HTTP 503 instead of proxying to a nonexistent local service.
+This makes the configuration failure explicit but does not enable registration
+without a functioning backend.
+
 ## Production topology
 
 Build the API and web Dockerfiles, deploy them behind a trusted HTTPS reverse proxy, and keep PostgreSQL and the API upstream on private networking. Local Compose binds ports only to loopback and is a development topology. Terminate TLS at the ingress; route browser traffic only through the web origin. Forward Origin unchanged. Configure HSTS at the ingress as well as the API. Do not enable wildcard CORS.

@@ -159,3 +159,23 @@ test("resumable upload interface queues real content", async ({ page }) => {
     page.getByRole("cell", { name: "queued", exact: true }),
   ).toBeVisible();
 });
+
+test("registration reports a non-JSON gateway failure without exposing a parser error", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/auth/register", (route) =>
+    route.fulfill({
+      status: 502,
+      contentType: "text/plain",
+      body: "The page could not be found",
+    }),
+  );
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("Test User");
+  await page.getByLabel("Email address").fill("gateway-test@example.org");
+  await page.getByLabel("Password", { exact: true }).fill("A strong test passphrase!");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "PLUTO API is unavailable. Please contact the platform administrator.",
+  );
+});

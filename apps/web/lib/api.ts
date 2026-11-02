@@ -20,6 +20,34 @@ let csrf = "";
 export function setCSRF(value: string) {
   csrf = value;
 }
+function apiErrorMessage(body: unknown): string | null {
+  if (!body || typeof body !== "object" || !("error" in body)) return null;
+  const error = (body as { error?: { message?: unknown } }).error;
+  return error && typeof error.message === "string" ? error.message : null;
+}
+
+async function readApiResponse<T>(response: Response): Promise<T> {
+  if (response.ok && response.status === 204) return undefined as T;
+  const contentType = response.headers.get("content-type")?.toLowerCase() || "";
+  if (!contentType.includes("application/json") && !contentType.includes("+json")) {
+    throw new Error(
+      "PLUTO API is unavailable. Please contact the platform administrator.",
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("PLUTO API returned an invalid response. Please try again later.");
+  }
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(data) || `PLUTO request failed (${response.status}).`);
+  }
+  return data as T;
+}
+
 export async function uploadChunk(path: string, data: Blob): Promise<void> {
   const response = await fetch(`/api/v1${path}`, {
     method: "PUT",
@@ -30,8 +58,7 @@ export async function uploadChunk(path: string, data: Blob): Promise<void> {
     },
     body: data,
   });
-  if (!response.ok)
-    throw new Error((await response.json()).error?.message || "Upload failed");
+  if (!response.ok) await readApiResponse(response);
 }
 export async function api<T>(
   path: string,
@@ -48,9 +75,7 @@ export async function api<T>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "Request failed");
-  return data as T;
+  return readApiResponse<T>(response);
 }
 export async function all<T>(path: string): Promise<T[]> {
   const items: T[] = [];

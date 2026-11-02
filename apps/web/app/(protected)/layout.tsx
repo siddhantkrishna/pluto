@@ -8,10 +8,19 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const cookie = await cookies();
-  const response = await fetch(
-    `${process.env.API_INTERNAL_URL || "http://127.0.0.1:8000"}/api/v1/auth/me`,
-    { headers: { Cookie: cookie.toString() }, cache: "no-store" },
-  );
+  const upstream =
+    process.env.API_INTERNAL_URL?.trim().replace(/\/+$/, "") ||
+    (process.env.NODE_ENV === "production" ? null : "http://127.0.0.1:8000");
+  if (!upstream) throw new Error("The identity service is not configured.");
+  let response: Response;
+  try {
+    response = await fetch(`${upstream}/api/v1/auth/me`, {
+      headers: { Cookie: cookie.toString() },
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("The identity service is unavailable. Please retry.");
+  }
   if (response.status === 401) redirect("/login");
   if (!response.ok)
     throw new Error("The identity service is unavailable. Please retry.");

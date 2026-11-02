@@ -1,13 +1,16 @@
 import type { NextConfig } from "next";
+// A production deployment must explicitly configure a reachable FastAPI backend.
+const configuredApi = process.env.API_INTERNAL_URL?.trim().replace(/\/+$/, "");
+const upstream =
+  configuredApi ||
+  (process.env.NODE_ENV === "production" ? undefined : "http://127.0.0.1:8000");
+
 const config: NextConfig = {
   output: "standalone",
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.API_INTERNAL_URL || "http://127.0.0.1:8000"}/api/:path*`,
-      },
-    ];
+    return upstream
+      ? [{ source: "/api/:path*", destination: `${upstream}/api/:path*` }]
+      : [];
   },
   async headers() {
     return [
