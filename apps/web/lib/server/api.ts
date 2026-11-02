@@ -126,6 +126,18 @@ export async function handleApi(req:NextRequest, parts:string[]) {
     }
     // Reject oversized metadata requests. Binary ingestion is not supported by this API.
     const path=parts.join("/");
+    if (path==="health" && req.method==="GET") {
+      return transaction(async db => {
+        const check=await first(db,`SELECT current_user AS role, r.rolsuper, r.rolbypassrls,
+          (SELECT count(*)::int FROM pg_tables WHERE schemaname='public'
+            AND tableowner=current_user) AS owned_tables
+          FROM pg_roles r WHERE r.rolname=current_user`);
+        if (!check || check.role!=="pluto_app" || check.rolsuper || check.rolbypassrls ||
+            Number(check.owned_tables)>0)
+          throw new HttpError(503,"PLUTO database application role is not safe.");
+        return result({status:"ok"});
+      });
+    }
     let body:Record<string,unknown>={};
     if (["POST","PUT","PATCH"].includes(req.method)) {
       const len=Number(req.headers.get("content-length")||0);
