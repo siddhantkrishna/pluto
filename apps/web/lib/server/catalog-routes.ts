@@ -68,7 +68,7 @@ export async function catalogRoutes(ctx:Context,parts:string[]) {
         classification=search.get("classification")||"",tag=search.get("tag")||"";
       if(q.length>160||status.length>30||classification.length>30||tag.length>40)
         throw new HttpError(422,"Invalid search filter.");
-      if(q) { params.push("%"+q.replace(/[\\%_]/g,"\\$&")+"%");where+=" AND (name ILIKE $"+params.length+" ESCAPE '\\\\' OR description ILIKE $"+params.length+" ESCAPE '\\\\')"; }
+      if(q) { params.push("%"+q.replace(/[!%_]/g, v=>"!"+v)+"%");where+=" AND (name ILIKE $"+params.length+" ESCAPE '!' OR description ILIKE $"+params.length+" ESCAPE '!')"; }
       if(status){params.push(status);where+=" AND status=$"+params.length;}
       if(classification){params.push(classification);where+=" AND classification=$"+params.length;}
       if(tag){params.push(JSON.stringify([tag]));where+=" AND tags @> $"+params.length+"::jsonb";}
@@ -122,7 +122,7 @@ export async function catalogRoutes(ctx:Context,parts:string[]) {
       if(q.length>160) throw new HttpError(422,"Invalid search query.");
       const params:unknown[]=[id];
       let where="WHERE institution_id=$1";
-      if(q) {params.push("%"+q.replace(/[\\%_]/g,"\\$&")+"%");where+=" AND name ILIKE $2 ESCAPE '\\\\'";}
+      if(q) {params.push("%"+q.replace(/[!%_]/g,v=>"!"+v)+"%");where+=" AND name ILIKE $2 ESCAPE '!'";}
       return result(await page(db,"SELECT * FROM data_sources "+where+" ORDER BY created_at DESC,id",params,offset,limit));
     }
     if(parts.length===2 && method==="POST") {
