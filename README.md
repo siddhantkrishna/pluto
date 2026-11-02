@@ -1,100 +1,87 @@
-# PLUTO by VOGON
+# PLUTO
 
-PLUTO Core is a multi-institution data catalog and governance platform. It provides account authentication, independent institutional workspaces, membership and invitation management, role-based permissions, metadata catalogs, source definitions, activity history, and installation administration.
+PLUTO by VOGON is a multi-institution data-governance and intelligence platform.
 
-**Step 01 baseline:** source definitions do not connect to external systems. No ingestion, file upload, AI, knowledge graph, or analytical pipeline is implemented. No AI API key or paid service is needed locally.
+## Current deployment: Next.js + Neon
 
-Source connections and multimodal ingestion are available under **Imports & search**. See [operations](docs/operations.md#source-ingestion-and-processing) for supported formats, worker configuration, Google OAuth setup and processing bounds. Live provider and capacity validation remain deployment tasks.
+The production web application is a single Next.js service on Vercel. Its Route Handlers
+implement the core API directly against a restricted Neon PostgreSQL role. **FastAPI
+and Render are not required to create accounts, sign in, manage institutions,
+memberships, invitations, access controls, catalog metadata or platform administration.**
 
-## Run with Docker
+- Web app: `apps/web` (Next.js 16, Node.js runtime).
+- Server routes: `apps/web/app/api/v1/[...path]/route.ts`.
+- Database and authorization: `apps/web/lib/server/`.
+- Existing PostgreSQL schema: the already-migrated Neon database, using `pluto_app`.
 
-Requires Docker Engine/Desktop with Compose v2 (Intel Mac supported by the images), Git, and Python 3 for configuration generation.
+### Configure Vercel
 
-```sh
-python3 infra/configure-local.py
-docker compose up --build
-```
+Set these variables on the **PLUTO Vercel project** (never use `NEXT_PUBLIC_`):
 
-The generator refuses to overwrite an existing `.env`. If using the native development configuration from this checkout, preserve it elsewhere before generating Docker configuration. It generates random local database passwords, never default credentials. Compose starts PostgreSQL, runs migrations as a separate one-shot job, then starts FastAPI and Next.js. Open **http://localhost:3000** and register an account. API documentation: **http://localhost:8000/docs**. PostgreSQL is not published to the host. Database and development email volumes persist across restarts.
+| Variable | Configuration |
+|---|---|
+| `DATABASE_URL` | Neon pooled connection URL, **restricted `pluto_app`** login, `postgresql://` scheme with SSL |
+| `WEB_ORIGIN` | Exactly `https://pluto.vogon.in` in production |
+| `SESSION_HOURS` | Optional; default `12` |
+| `RESEND_API_KEY` | Optional; HTTPS transactional-email API key for recovery and invitations |
+| `MAIL_FROM` | Required with `RESEND_API_KEY`: verified email sender |
 
-Development email links are written to a private volume, never returned by the API:
+No `API_INTERNAL_URL`, Docker web proxy, Render service, SMTP host, migration-owner connection, or Python process is required for this Next.js core.
 
-```sh
-docker compose exec api sh -c 'ls /app/.dev-mail'
-docker compose exec api cat /app/.dev-mail/SELECTED_FILE.eml
-```
+The PostgreSQL schema is **not** re-created by Next.js. The current schema uses the
+original Alembic migration series through `c5f609506dd2`. The old migrations remain
+in `apps/api/alembic` as a historical maintenance reference. Never run migrations
+with the restricted `pluto_app` database role.
 
-Open recovery/invitation links in the same browser as PLUTO. Invitation acceptance requires the invited account to be signed in. Links use URL fragments to keep tokens out of request URLs and are cleared from browser history after loading.
+### Security
 
-## Native development
+- All database operations are parameterized and run in transactions using the restricted
+  application role; tenant/user context is always transaction-local for PostgreSQL RLS.
+- Sessions are stored as SHA-256 hashed tokens in PostgreSQL and set in
+  HttpOnly, Secure (production), SameSite=Lax cookies.
+- Newly registered passwords use salted Node.js scrypt hashes. No existing account
+  data was present at the time of the migration. Pre-existing Python Argon2 hashes
+  are **not** supported by the new login verifier and require a separately reviewed
+  credential migration if such data is introduced.
+- Write APIs require same-origin requests and a CSRF token for authenticated actions.
+- Database passwords never belong in client bundles or source control.
 
-Use PostgreSQL 17+, Node.js 24 LTS, and Python 3.14. Create a UTF-8 database and a `pluto_app` login with **NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE**, separate from the migration/schema owner. Use independently generated passwords. The migration requires that `pluto_app` already exists. Set `DATABASE_URL` to its SQLAlchemy `postgresql+psycopg://` URL and `MIGRATION_DATABASE_URL` to the schema owner's URL in root `.env`. Set `WEB_ORIGIN=http://localhost:3000` and `ENVIRONMENT=development`. The `.env.example` deliberately contains names without values.
+### Known gaps
 
-```sh
-cd apps/api
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/alembic upgrade head
-.venv/bin/uvicorn pluto.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
-```
+**This is a core-services migration, not a full replacement for Python processing.**
+The older `apps/api` code and Docker workflow are retained for archival/recovery purposes,
+but are **not used by the deployed Next.js application**. The following capabilities
+currently return an explicit HTTP 501 until rewritten against durable object storage
+and independently deployed processing workers:
 
-In another terminal:
+- Large-file/resumable uploads, content extraction, indexing, search, and previews.
+- Google Drive/PostgreSQL source connectors and background synchronization.
+- Persistent media processing and scheduled ingestion workers.
+
+Do not delete existing data, assets or the old backend source as a shortcut, or represent
+these features as working on Vercel. Core authentication, governance and catalog functionality
+must be verified before turning off the Render deployment.
+
+### Develop
 
 ```sh
 cd apps/web
-npm ci
+npm install
+npm run typecheck
+npm run build
 npm run dev
 ```
 
-Next.js proxies `/api/*` to FastAPI. The browser uses a single origin. Native development defaults to `http://127.0.0.1:8000`; Docker uses `http://api:8000`. Restart/rebuild the web application after changing the upstream URL. Never put database credentials in `NEXT_PUBLIC_*` variables.
+For local testing, supply `DATABASE_URL` pointing to a disposable, migrated Neon
+branch using `pluto_app`, and `WEB_ORIGIN=http://localhost:3000`. Never use
+a database owner or privileged Neon dashboard role in application execution.
+End-to-end Playwright tests create real database records; use a disposable branch.
 
-## First platform administrator
+### Platform administrator
 
-Registering an account never grants platform privileges. Supply a new dedicated email, name, and strong password as `PLUTO_ADMIN_EMAIL`, `PLUTO_ADMIN_NAME`, and `PLUTO_ADMIN_PASSWORD` in the process environment, using your secret manager or a non-echoing shell prompt. From `apps/api`, with the migration URL available:
+Ordinary registration deliberately does not grant platform-level privileges. To bootstrap
+the first administrator, register a dedicated account and use an authorized Neon
+database-owner SQL session (not the application role) to insert one `platform_admins`
+record. Do not expose an unauthenticated admin-bootstrap HTTP endpoint.
 
-```sh
-.venv/bin/python -m pluto.admin
-```
-
-For Docker, use the migration image with environment variables explicitly passed from your shell:
-
-```sh
-docker compose run --rm -e PLUTO_ADMIN_EMAIL -e PLUTO_ADMIN_NAME -e PLUTO_ADMIN_PASSWORD migrate python -m pluto.admin
-```
-
-The command refuses to run once any platform administrator exists and refuses to overwrite existing accounts. Remove the provisioning variables afterward. Subsequent administrator changes use authenticated platform administration. The API-serving container deliberately receives no migration URL.
-
-## Verification
-
-Use a **separate disposable UTF-8 PostgreSQL database**, migrated to head, with the same restricted application role. Set `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `ENVIRONMENT=test`, and `PLUTO_TEST_ALLOW_RESET=yes` in an ignored test env file. **Tests truncate their configured database.** Never point them at an institution's real data.
-
-```sh
-cd apps/api
-.venv/bin/dotenv -f ../../.local/test.env run -- .venv/bin/alembic upgrade head
-.venv/bin/dotenv -f ../../.local/test.env run -- .venv/bin/pytest -q
-.venv/bin/ruff check pluto tests
-cd ../web
-npm run typecheck
-npm run build
-npx playwright install chromium
-npm test
-```
-
-Browser tests require the API and web server running at localhost ports 8000/3000. They create clearly named verification accounts/workspaces in the running development database. See [verification notes](docs/verification.md) for checks actually executed in this checkout.
-
-API contracts are generated from FastAPI, not separately maintained business rules:
-
-```sh
-./infra/generate-contracts.sh
-```
-
-## Structure and operations
-
-- `apps/api/pluto`: API routers, Pydantic contracts, SQLAlchemy models, transaction-scoped database access, centralized authorization, services, and scoped repository helpers.
-- `apps/web`: Next.js App Router, server-side authentication gate, accessible forms/dialogs, generated API types, responsive VOGON styling, and locally bundled open-source fonts.
-- `packages/openapi.json`: generated API contract.
-- `infra`: container bootstrap and contract generation.
-- [Architecture and security](docs/architecture.md)
-- [Deployment, migrations, and environment reference](docs/operations.md)
-
-The core is designed for later ingestion services; it does not establish or benchmark 1 TB processing capacity. Independent security review, operational hardening, and capacity testing remain deployment responsibilities. No certification or accreditation is claimed.
+See `docs/operations.md` for historical migration/database notes and architecture limits.
