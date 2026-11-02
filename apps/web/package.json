@@ -18,7 +18,8 @@
     "hash-wasm": "4.12.0",
     "next": "^16.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@neondatabase/serverless": "1.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
