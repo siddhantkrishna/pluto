@@ -7,7 +7,7 @@ type Client = {
   query(query: string, params?: unknown[]): Promise<{ rows: Record<string, any>[] }>;
   release(): void;
 };
-let sharedPool: Pool | undefined;
+
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -22,15 +22,16 @@ export function dbPool(): Pool {
   const parsed = new URL(url);
   if (decodeURIComponent(parsed.username) !== "pluto_app")
     throw new HttpError(503, "PLUTO must connect using its restricted pluto_app database role.");
-  return (sharedPool ??= new Pool({
+  return new Pool({
     connectionString: url,
     max: 4,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 15000,
-  }));
+  });
 }
 export async function transaction<T>(fn: (db: Client) => Promise<T>): Promise<T> {
-  const client = (await dbPool().connect()) as unknown as Client;
+  const pool = dbPool();
+  const client = (await pool.connect()) as unknown as Client;
   try {
     await client.query("BEGIN");
     const result = await fn(client);
@@ -41,6 +42,7 @@ export async function transaction<T>(fn: (db: Client) => Promise<T>): Promise<T>
     throw error;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 export type DB = Client;
