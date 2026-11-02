@@ -1,26 +1,15 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { handleApi } from "@/lib/server/api";
 
-// Used only when no API rewrite is configured. Never pretend an account was created.
 export const dynamic = "force-dynamic";
-
-function unavailable() {
-  return NextResponse.json(
-    {
-      error: {
-        message: "PLUTO's account service is temporarily unavailable. Please contact the administrator.",
-      },
-    },
-    {
-      status: 503,
-      headers: { "Cache-Control": "no-store" },
-    },
-  );
+export const runtime = "nodejs";
+type Context = { params: Promise<{ path: string[] }> };
+async function dispatch(req: NextRequest, context: Context) {
+  const { path } = await context.params;
+  return handleApi(req, path || []);
 }
-
-export const GET = unavailable;
-export const POST = unavailable;
-export const PUT = unavailable;
-export const PATCH = unavailable;
-export const DELETE = unavailable;
-export const HEAD = unavailable;
-export const OPTIONS = unavailable;
+export const GET = dispatch;
+export const POST = dispatch;
+export const PUT = dispatch;
+export const PATCH = dispatch;
+export const DELETE = dispatch;
