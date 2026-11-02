@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 
 // The PostgreSQL login MUST be pluto_app, never the table owner.
 // All tenant-scoped statements run in a single transaction, using SET LOCAL.
-type Client = Awaited<ReturnType<Pool["connect"]>>;
+type Client = {
+  query(query: string, params?: unknown[]): Promise<{ rows: Record<string, any>[] }>;
+  release(): void;
+};
 let sharedPool: Pool | undefined;
 
 export class HttpError extends Error {
@@ -27,7 +30,7 @@ export function dbPool(): Pool {
   }));
 }
 export async function transaction<T>(fn: (db: Client) => Promise<T>): Promise<T> {
-  const client = await dbPool().connect();
+  const client = (await dbPool().connect()) as unknown as Client;
   try {
     await client.query("BEGIN");
     const result = await fn(client);
