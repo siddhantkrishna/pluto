@@ -15,7 +15,7 @@ export async function tenantRoutes(ctx: Context, parts:string[]) {
   const {offset,limit}=pageParams(req);
   if (parts.length===1 && parts[0]==="institutions") {
     if (method==="GET") {
-      const items=await rows(db,`SELECT row_to_json(i.*) AS institution, m.role
+      const items=await rows(db,`SELECT row_to_json(i) AS institution, m.role
         FROM institutions i JOIN memberships m ON m.institution_id=i.id
         WHERE m.user_id=$1 ORDER BY i.name`,[me.user.id]);
       return result(items);
